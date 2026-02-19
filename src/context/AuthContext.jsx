@@ -7,9 +7,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // =========================
-  // REGISTER
-  // =========================
+  /* =========================
+     REGISTER
+  ========================= */
   const register = async (name, email, password) => {
     try {
       await API.post("/auth/register", {
@@ -28,9 +28,9 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // =========================
-  // LOGIN
-  // =========================
+  /* =========================
+     LOGIN
+  ========================= */
   const login = async (email, password) => {
     try {
       const res = await API.post("/auth/login", {
@@ -38,12 +38,15 @@ export const AuthProvider = ({ children }) => {
         password
       })
 
-      setAccessToken(res.data.accessToken)
-      setUser(res.data.user)
-      return {
-        success: true,
-        user: res.data.user
-      }
+      const { accessToken, refreshToken, user } = res.data
+
+      // Store tokens in localStorage
+      setAccessToken(accessToken)
+      localStorage.setItem("refreshToken", refreshToken)
+
+      setUser(user)
+
+      return { success: true, user }
     } catch (error) {
       return {
         success: false,
@@ -53,40 +56,59 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // =========================
-  // LOGOUT
-  // =========================
+  /* =========================
+     LOGOUT
+  ========================= */
   const logout = async () => {
     try {
-      await API.post("/auth/logout")
+      const refreshToken = localStorage.getItem("refreshToken")
+
+      if (refreshToken) {
+        await API.post("/auth/logout", { refreshToken })
+      }
     } catch (error) {
       console.log("Logout error:", error)
     } finally {
-      setUser(null)
+      // Clear everything
+      localStorage.removeItem("refreshToken")
       setAccessToken(null)
+      setUser(null)
     }
   }
 
-
- 
-  // =========================
-  // AUTO REFRESH ON APP LOAD
-  // =========================
+  /* =========================
+     AUTO REFRESH ON APP LOAD
+  ========================= */
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const res = await API.post("/auth/refresh")
-        console.log(res, "res")
-        console.log(res.data,"res.data")
-        setAccessToken(res.data.accessToken)
+        const refreshToken = localStorage.getItem("refreshToken")
 
-        // 🔥 FIX: use user from refresh directly
-        setUser(res.data.user)
-              console.log(user,"userfrom auth")
+        if (!refreshToken) {
+          setLoading(false)
+          return
+        }
 
-      } catch {
-        setUser(null)
+        const res = await API.post("/auth/refresh", {
+          refreshToken
+        })
+
+        const {
+          accessToken,
+          refreshToken: newRefreshToken,
+          user
+        } = res.data
+
+        // Save new rotated tokens
+        setAccessToken(accessToken)
+        localStorage.setItem("refreshToken", newRefreshToken)
+
+        setUser(user)
+      } catch (error) {
+        // If refresh fails → clear everything
+        localStorage.removeItem("refreshToken")
         setAccessToken(null)
+        setUser(null)
       } finally {
         setLoading(false)
       }
@@ -95,9 +117,9 @@ export const AuthProvider = ({ children }) => {
     initializeAuth()
   }, [])
 
-  // =========================
-  // ROLE HELPERS
-  // =========================
+  /* =========================
+     ROLE HELPERS
+  ========================= */
   const isAdmin = user?.role === "ADMIN"
   const isManager = user?.role === "MANAGER"
   const isUser = user?.role === "USER"
