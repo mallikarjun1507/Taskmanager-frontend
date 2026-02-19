@@ -82,30 +82,26 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const refreshToken = localStorage.getItem("refreshToken")
+        const storedAccessToken = localStorage.getItem("accessToken")
+        const storedRefreshToken = localStorage.getItem("refreshToken")
 
-        if (!refreshToken) {
+        if (!storedAccessToken || !storedRefreshToken) {
           setLoading(false)
           return
         }
 
-        const res = await API.post("/auth/refresh", {
-          refreshToken
-        })
+        // Set access token in memory
+        setAccessToken(storedAccessToken)
 
-        const {
-          accessToken,
-          refreshToken: newRefreshToken,
-          user
-        } = res.data
+        // Try getting profile (this will trigger interceptor if expired)
+        const res = await API.get("/auth/profile")
 
-        // Save new rotated tokens
-        setAccessToken(accessToken)
-        localStorage.setItem("refreshToken", newRefreshToken)
+        setUser(res.data)
 
-        setUser(user)
       } catch (error) {
-        // If refresh fails → clear everything
+        console.log("Initialization failed:", error?.response?.data)
+
+        localStorage.removeItem("accessToken")
         localStorage.removeItem("refreshToken")
         setAccessToken(null)
         setUser(null)

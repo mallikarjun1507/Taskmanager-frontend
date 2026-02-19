@@ -1,15 +1,9 @@
 import axios from "axios"
 
-/* =========================
-   CREATE AXIOS INSTANCE
-========================= */
 const API = axios.create({
   baseURL: "https://taskmanager-backend-u0mq.onrender.com/api/"
 })
 
-/* =========================
-   TOKEN STORAGE
-========================= */
 let accessToken = localStorage.getItem("accessToken") || null
 
 export const setAccessToken = (token) => {
@@ -23,7 +17,7 @@ export const setAccessToken = (token) => {
 }
 
 /* =========================
-   ATTACH ACCESS TOKEN
+   REQUEST INTERCEPTOR
 ========================= */
 API.interceptors.request.use((config) => {
   if (accessToken) {
@@ -33,38 +27,28 @@ API.interceptors.request.use((config) => {
 })
 
 /* =========================
-   HANDLE 401 + AUTO REFRESH
+   RESPONSE INTERCEPTOR
 ========================= */
 API.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
 
-    // If no response or no config → reject
     if (!error.response || !originalRequest) {
       return Promise.reject(error)
     }
 
-    const isAuthRoute =
-      originalRequest.url.includes("/auth/login") ||
-      originalRequest.url.includes("/auth/register") ||
-      originalRequest.url.includes("/auth/refresh")
-
     if (
       error.response.status === 401 &&
-      !originalRequest._retry &&
-      !isAuthRoute
+      !originalRequest._retry
     ) {
       originalRequest._retry = true
 
       try {
         const refreshToken = localStorage.getItem("refreshToken")
 
-        if (!refreshToken) {
-          throw new Error("No refresh token")
-        }
+        if (!refreshToken) throw new Error("No refresh token")
 
-        // 🔥 Send refreshToken in body
         const res = await axios.post(
           "https://taskmanager-backend-u0mq.onrender.com/api/auth/refresh",
           { refreshToken }
@@ -75,19 +59,17 @@ API.interceptors.response.use(
           refreshToken: newRefreshToken
         } = res.data
 
-        // Save new tokens
         setAccessToken(newAccessToken)
         localStorage.setItem("refreshToken", newRefreshToken)
 
-        // Retry original request
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
 
         return API(originalRequest)
 
       } catch (refreshError) {
-        // If refresh fails → clear everything
-        setAccessToken(null)
+        localStorage.removeItem("accessToken")
         localStorage.removeItem("refreshToken")
+        setAccessToken(null)
 
         window.location.href = "/login"
 
