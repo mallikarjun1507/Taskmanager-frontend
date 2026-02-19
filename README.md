@@ -102,7 +102,7 @@ https://taskmanager-frontend-uzr3.onrender.com
 
 ---
  architect diagram
- 
+ ```bash
 ┌────────────────────────────┐
 │        Client (Browser)    │
 │        React + Vite        │
@@ -137,5 +137,5 @@ https://taskmanager-frontend-uzr3.onrender.com
 │  - Users Collection        │
 │  - Tasks Collection        │
 └────────────────────────────┘
-
+```
 
